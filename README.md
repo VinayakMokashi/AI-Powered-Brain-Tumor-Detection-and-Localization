@@ -44,6 +44,8 @@ Pre-trained weights for the ResUNet model, saved in HDF5 format.
 utilities.py:
 A Python script containing helper functions used across the project, such as data preprocessing utilities and image augmentation techniques.
 
+Brain_Tumor_Detection.pdf: Povides a detailed overview of an AI-driven approach for brain tumor detection and localization using ResNet for classification and ResUNet for segmentation on MRI scans.
+
 ## Dataset:
 
 The dataset consists of 3,929 MRI images. Each image has an associated mask, which identifies regions containing tumors. This project uses data.csv and data_mask.csv to organize and process the images for training and evaluation. Key attributes in these files:
