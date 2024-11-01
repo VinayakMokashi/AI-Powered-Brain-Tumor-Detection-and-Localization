@@ -62,7 +62,7 @@ The MRI images are preprocessed by resizing, normalization, and cross-validation
 
 Due to the large size of the dataset and pre-trained model files, these assets are stored in Google Drive. You can access them via https://drive.google.com/drive/folders/1CsN9RNYHVhi5JfU-lKC4p2oevZHswhof. The folder contains:
 
-data.csv and data_mask.csv for managing image and mask paths.
+data.csv and data_mask.csv for managing image and mask paths. It also contains a guide file Brain_Tumor_Detection.pdf (provides a detailed overview of an AI-driven approach for brain tumor detection and localization using ResNet for classification and ResUNet for segmentation on MRI scans).
 
 weights.hdf5 and weights_seg.hdf5 for the pre-trained ResNet50 and ResUNet models, respectively.
 
