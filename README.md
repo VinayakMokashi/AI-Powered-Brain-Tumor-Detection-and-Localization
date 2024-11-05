@@ -21,7 +21,7 @@ __Streamlined Data Handling__: Processes large MRI datasets, including normaliza
 ### Files and Folders:
 
 Brain_Tumor.ipynb:
-The main Jupyter Notebook that contains the entire pipeline, including data preprocessing, model training, evaluation, and visualization of results.
+The main Colab file that contains the entire pipeline, including data preprocessing, model training, evaluation, and visualization of results.
 
 data.csv:
 Metadata file containing the image paths and labels for the MRI scans.
