@@ -112,6 +112,8 @@ of the notebook.
 ```
 .
 ├── Brain_Tumor.ipynb        # End-to-end pipeline: EDA → classifier → segmenter → evaluation
+├── models.py                # Model builders: ResNet50 classifier + ResUNet
+├── train.py                 # Reproducible training — regenerates the weights + JSON files
 ├── utilities.py             # Custom DataGenerator, Focal Tversky loss, two-stage inference
 ├── requirements.txt         # Pinned Python dependencies
 ├── docs/
@@ -124,8 +126,9 @@ of the notebook.
 **Not committed** (large / generated locally — see `.gitignore`): the MRI dataset
 (`Brain_MRI/`, `data.csv`, `data_mask.csv`), the trained weights
 (`weights.hdf5`, `weights_seg.hdf5`) and the serialized architectures
-(`resnet-50-MRI.json`, `ResUNet-MRI.json`). The notebook regenerates the JSON
-architectures and weights when you train the models.
+(`resnet-50-MRI.json`, `ResUNet-MRI.json`). Run [`train.py`](train.py) to
+(re)generate the weights and architecture JSON files — see
+[Getting the trained weights](#getting-the-trained-weights) below.
 
 ## Getting started
 
@@ -159,8 +162,33 @@ jupyter notebook Brain_Tumor.ipynb
 
 When running locally, remove the `from google.colab import ...` /
 `drive.mount(...)` cells and point the dataset path at your local dataset folder.
-A GPU is strongly recommended for training (inference on the provided weights
-runs fine on CPU, just slower).
+A GPU is strongly recommended for training (inference on trained weights runs
+fine on CPU, just slower).
+
+### Getting the trained weights
+
+The notebook's evaluation sections load four files that are **not** committed
+(they're large): `weights.hdf5` + `resnet-50-MRI.json` (classifier) and
+`weights_seg.hdf5` + `ResUNet-MRI.json` (segmenter). You have two options.
+
+**1. Train them yourself (fully reproducible).** [`train.py`](train.py) builds,
+trains and saves all four files, after which the notebook runs end-to-end:
+
+```bash
+# trains both stages and writes the .hdf5 / .json files into the data folder
+python train.py --data-dir /path/to/Brain_MRI
+
+# handy flags:
+#   --stage classifier|segmenter|all   pick a stage
+#   --clf-epochs N  --seg-epochs N      epochs per stage
+#   --batch-size N                      batch size (default 16)
+```
+
+**2. Use pre-trained weights (optional).** If you host your trained weights on a
+[GitHub Release](https://github.com/VinayakMokashi/AI-Powered-Brain-Tumor-Detection-and-Localization/releases)
+or Google Drive, drop the four files into the dataset folder and jump straight to
+the evaluation cells. *(No pre-trained weights are published yet — use `train.py`
+above to generate them.)*
 
 ## How the code is organized
 
@@ -174,6 +202,10 @@ off-the-shelf Keras are factored into [`utilities.py`](utilities.py):
   metric and loss functions (see [Abraham & Khan, 2018](https://arxiv.org/abs/1810.07842)).
 - **`prediction`** — runs the complete classify-then-segment inference over a
   test set and returns per-scan masks and a has-tumor flag.
+
+The network architectures live in [`models.py`](models.py) (`build_classifier`,
+`build_resunet`), and [`train.py`](train.py) wires the data, models and loss
+together into a single reproducible training run.
 
 ## Tech stack
 
