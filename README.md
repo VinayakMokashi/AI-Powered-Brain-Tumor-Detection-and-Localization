@@ -1,133 +1,201 @@
-# AI-Powered Detection and Localization of Brain Tumors Using MRI Scans
+# 🧠 AI-Powered Brain Tumor Detection & Localization
 
-This repository contains a deep learning-based solution for detecting and localizing brain tumors using MRI scans. Utilizing a layered pipeline of ResNet and ResUNet models, the project provides an efficient and accurate method for medical image classification and segmentation. Transfer learning is also used to save computational time and costs.
+![Python](https://img.shields.io/badge/Python-3.x-blue.svg)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-2.11-orange.svg)
+![Keras](https://img.shields.io/badge/Keras-API-red.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-## Project Overview:
+A deep-learning system that **detects** and **localizes** brain tumors in MRI
+scans. It chains two models into a single pipeline: a **ResNet50** classifier
+that decides whether a scan contains a tumor, followed by a **ResUNet**
+segmentation network that outlines the tumor at the pixel level for every scan
+flagged as positive.
 
-Brain tumor detection and localization play a crucial role in early diagnosis and treatment planning. This project leverages the power of Convolutional Neural Networks (CNNs) to classify MRI images and pinpoint tumor locations at a pixel level, offering a robust solution for healthcare professionals.
+<p align="center">
+  <b>MRI scan → [ ResNet50: tumor? ] → if yes → [ ResUNet: where? ] → pixel-level mask</b>
+</p>
 
-## Key Components:
+> **Disclaimer:** This is a research / portfolio project. It is **not** a medical
+> device and must not be used for actual diagnosis.
 
-__ResNet Model__: Classifies brain MRI scans to detect the presence of tumors.
+---
 
-__ResUNet Model__: Segments and localizes tumors in detected cases, providing pixel-level accuracy.
+## Table of Contents
 
-__Transfer Learning__: Utilizes a pre-trained ResNet50 model on the ImageNet dataset to accelerate training and reduce computational requirements.
+- [Why two models?](#why-two-models)
+- [Architecture](#architecture)
+- [Dataset](#dataset)
+- [Results](#results)
+- [Repository structure](#repository-structure)
+- [Getting started](#getting-started)
+- [How the code is organized](#how-the-code-is-organized)
+- [Tech stack](#tech-stack)
+- [Future work](#future-work)
+- [License & acknowledgements](#license--acknowledgements)
 
-__Streamlined Data Handling__: Processes large MRI datasets, including normalization, cross-validation splits, and batch training.
+---
 
-## Project Structure:
+## Why two models?
 
-### Files and Folders:
+Every scan raises two clinically different questions — *is there a tumor?* and
+*where is it?* — and no single model answers both cleanly:
 
-Brain_Tumor.ipynb:
-The main Colab file that contains the entire pipeline, including data preprocessing, model training, evaluation, and visualization of results.
+- A **classifier** alone tells you a tumor exists but not its location.
+- A **segmentation** model alone is heavier, harder to train on imbalanced data,
+  and wastes compute on the ~65% of scans that are healthy.
 
-data.csv:
-Metadata file containing the image paths and labels for the MRI scans.
+So I use a **two-stage cascade**: a fast classifier screens *every* scan, and
+only the positives are handed to the segmentation network. This is both
+efficient and accurate — the same screening-then-diagnosis pattern used in real
+radiology workflows.
 
-data_mask.csv:
-Metadata file mapping each MRI scan to its corresponding mask, indicating the location of the tumor for segmentation.
+## Architecture
 
-resnet-50-MRI.json:
-JSON file defining the architecture of the ResNet50 model used for classification.
+| Stage | Model | Task | Key idea |
+| :---: | --- | --- | --- |
+| **1** | ResNet50 (transfer learning) | Binary classification — tumor vs. no tumor | Freeze an ImageNet-pretrained backbone, train only a custom softmax head |
+| **2** | ResUNet + Focal Tversky loss | Semantic segmentation — pixel-level mask | U-Net encoder/decoder built from residual blocks + skip connections |
 
-ResUNet-MRI.json:
-JSON file defining the architecture of the ResUNet model used for segmentation and tumor localization.
+**ResUNet at a glance:**
 
-weights.hdf5:
-Pre-trained weights for the ResNet50 model, saved in HDF5 format.
+```
+Encoder (downsampling)                          Decoder (upsampling)
+  Stage 1  Conv x2   (16)  ------ skip ------>  concat -> ResBlock (16)
+  Stage 2  ResBlock  (32)  ------ skip ------>  concat -> ResBlock (32)
+  Stage 3  ResBlock  (64)  ------ skip ------>  concat -> ResBlock (64)
+  Stage 4  ResBlock (128)  ------ skip ------>  concat -> ResBlock (128)
+              \                                        /
+               ------>  Bottleneck ResBlock (256)  ----
+  Final: Conv 1x1 + sigmoid  ->  tumor mask (256 x 256 x 1)
+```
 
-weights_seg.hdf5:
-Pre-trained weights for the ResUNet model, saved in HDF5 format.
+The segmentation model is trained with the **Focal Tversky loss**, which weights
+missed tumor pixels more heavily than false alarms — essential because tumor
+pixels are a tiny fraction of each scan. See
+[`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md) for the full technical write-up.
 
-utilities.py:
-A Python script containing helper functions used across the project, such as data preprocessing utilities and image augmentation techniques.
+## Dataset
 
-Brain_Tumor_Detection.pdf: Povides a detailed overview of an AI-driven approach for brain tumor detection and localization using ResNet for classification and ResUNet for segmentation on MRI scans.
+[**LGG MRI Segmentation**](https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation)
+— FLAIR brain MRI scans from The Cancer Genome Atlas (TCGA), each paired with a
+manually annotated binary tumor mask.
 
-## Dataset:
+| Property | Value |
+| --- | --- |
+| Total scans | 3,929 |
+| Tumor-negative (`mask = 0`) | 2,556 |
+| Tumor-positive (`mask = 1`) | 1,373 |
+| Image size | 256 × 256 × 3 |
+| Mask values | 0 (background) / 255 (tumor) |
 
-The dataset consists of 3,929 MRI images. Each image has an associated mask, which identifies regions containing tumors. This project uses data.csv and data_mask.csv to organize and process the images for training and evaluation. Key attributes in these files:
+Two metadata files (`data.csv`, `data_mask.csv`) map each scan to its mask and
+store the binary tumor flag.
 
-__Image Path__: Location of each MRI scan.
+## Results
 
-__Mask Path__: Location of the corresponding mask image, highlighting the tumor area.
+The ResNet50 classifier was evaluated on a held-out test set of **576 scans**:
 
-__Patient ID__: Unique identifier for each patient record in the dataset.
+| Metric | Class 0 (no tumor) | Class 1 (tumor) |
+| --- | :---: | :---: |
+| Precision | 0.98 | 0.98 |
+| Recall | 0.99 | 0.96 |
+| F1-score | 0.99 | 0.97 |
 
-The MRI images are preprocessed by resizing, normalization, and cross-validation split creation to ensure efficient training and testing. The data has been structured for use in both classification and segmentation tasks.
+**Overall classification accuracy: 98.1%.**
 
-## Accessing the Dataset and Models:
+The ResUNet produces tight, well-localized tumor masks. Qualitative results —
+MRI, ground-truth mask, AI-predicted mask, and overlays — are rendered at the end
+of the notebook.
 
-Due to the large size of the dataset and pre-trained model files, these assets are stored in Google Drive. You can access them via https://drive.google.com/drive/folders/1CsN9RNYHVhi5JfU-lKC4p2oevZHswhof. The folder contains:
+## Repository structure
 
-data.csv and data_mask.csv for managing image and mask paths. It also contains a guide file Brain_Tumor_Detection.pdf (provides a detailed overview of an AI-driven approach for brain tumor detection and localization using ResNet for classification and ResUNet for segmentation on MRI scans).
+```
+.
+├── Brain_Tumor.ipynb        # End-to-end pipeline: EDA → classifier → segmenter → evaluation
+├── utilities.py             # Custom DataGenerator, Focal Tversky loss, two-stage inference
+├── requirements.txt         # Pinned Python dependencies
+├── docs/
+│   └── PROJECT_REPORT.md    # Technical write-up (problem, approach, results, limitations)
+├── LICENSE                  # MIT
+├── .gitignore
+└── README.md
+```
 
-weights.hdf5 and weights_seg.hdf5 for the pre-trained ResNet50 and ResUNet models, respectively.
+**Not committed** (large / generated locally — see `.gitignore`): the MRI dataset
+(`Brain_MRI/`, `data.csv`, `data_mask.csv`), the trained weights
+(`weights.hdf5`, `weights_seg.hdf5`) and the serialized architectures
+(`resnet-50-MRI.json`, `ResUNet-MRI.json`). The notebook regenerates the JSON
+architectures and weights when you train the models.
 
-Additional files like resnet-50-MRI.json and ResUNet-MRI.json to define model architectures and also the main code file Brain_Tumor.ipynb. It also contains a code file named utilities.py.
+## Getting started
 
-## Model Overview
+### Option A — Google Colab (recommended)
 
-__ResNet50__ - Tumor Classification
+The notebook was built on Colab with a free GPU. Just open it and run:
 
-The ResNet50 model, a widely-used deep residual network, is employed here for binary classification:
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/VinayakMokashi/AI-Powered-Brain-Tumor-Detection-and-Localization/blob/main/Brain_Tumor.ipynb)
 
-Input: Preprocessed MRI images.
+1. Open the badge above (Runtime → Change runtime type → **GPU**).
+2. Download the [LGG MRI dataset](https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation)
+   and place it in your Google Drive (e.g. `MyDrive/Brain_MRI/`).
+3. Update the dataset path cell (`%cd /content/drive/MyDrive/Brain_MRI`) to match
+   your folder, then run the cells top to bottom.
 
-Output: Binary classification indicating the presence or absence of a tumor.
+### Option B — Run locally
 
-Transfer Learning: Leveraging a pre-trained ResNet50 from the ImageNet dataset, this model achieves high accuracy with minimal training time.
+```bash
+# 1. Clone
+git clone https://github.com/VinayakMokashi/AI-Powered-Brain-Tumor-Detection-and-Localization.git
+cd AI-Powered-Brain-Tumor-Detection-and-Localization
 
-__ResUNet__ - Tumor Localization and Segmentation
+# 2. Create an environment and install dependencies
+python -m venv .venv
+# Windows:  .venv\Scripts\activate    |    macOS/Linux:  source .venv/bin/activate
+pip install -r requirements.txt
 
-The ResUNet model combines the ResNet architecture with the U-Net segmentation model, facilitating pixel-wise tumor localization:
+# 3. Launch Jupyter
+jupyter notebook Brain_Tumor.ipynb
+```
 
-Input: MRI images with detected tumors.
+When running locally, remove the `from google.colab import ...` /
+`drive.mount(...)` cells and point the dataset path at your local dataset folder.
+A GPU is strongly recommended for training (inference on the provided weights
+runs fine on CPU, just slower).
 
-Output: Segmentation mask highlighting the tumor region.
+## How the code is organized
 
-Pixel-Level Accuracy: Allows for precise localization, which is crucial for medical imaging tasks.
+Most of the pipeline lives in the notebook, but the pieces that don't fit
+off-the-shelf Keras are factored into [`utilities.py`](utilities.py):
 
-__Transfer Learning__
+- **`DataGenerator`** — a Keras `Sequence` that streams (MRI, mask) pairs in
+  batches, resizing and normalizing on the fly so the full dataset never has to
+  sit in memory.
+- **`tversky` / `tversky_loss` / `focal_tversky`** — the segmentation
+  metric and loss functions (see [Abraham & Khan, 2018](https://arxiv.org/abs/1810.07842)).
+- **`prediction`** — runs the complete classify-then-segment inference over a
+  test set and returns per-scan masks and a has-tumor flag.
 
-Transfer learning is applied to both models:
+## Tech stack
 
-Accelerated Training: Starting with pre-trained weights on a large-scale dataset like ImageNet enhances the models’ learning capability with limited training data.
+`Python` · `TensorFlow / Keras` · `NumPy` · `pandas` · `OpenCV` ·
+`scikit-image` · `scikit-learn` · `Matplotlib` · `Seaborn` · `Plotly`
 
-Computational Efficiency: Reduces the need for extensive resources by leveraging knowledge from the initial training phase.
+## Future work
 
-## Model Performance:
+- k-fold cross-validation for tighter confidence intervals on the metrics
+- Hyperparameter tuning and test-time augmentation
+- Uncertainty estimation on the predicted masks
+- A small **Streamlit / Flask** web app for interactive, real-time inference
 
-Both models were evaluated using key metrics such as accuracy, precision, recall, and F1 score:
+## License & acknowledgements
 
-__Classification Accuracy__: The ResNet50 model achieved an accuracy of 98%, ensuring reliable classification results.
+Released under the [MIT License](LICENSE).
 
-__Segmentation Precision__: The ResUNet model demonstrated excellent performance in localizing tumors, with high recall and F1 scores.
+- Dataset: [LGG MRI Segmentation](https://www.kaggle.com/mateuszbuda/lgg-mri-segmentation) (M. Buda et al.)
+- ResNet: He et al., *Deep Residual Learning for Image Recognition* (2015)
+- U-Net: Ronneberger et al., *U-Net: Convolutional Networks for Biomedical Image Segmentation* (2015)
+- Focal Tversky loss: Abraham & Khan (2018)
 
-## Usage Instructions
+---
 
-__Prerequisites__:
-
-Python 3.x
-
-GPU
-
-TensorFlow, Keras, OpenCV, and other required libraries
-
-## Running the Models:
-
-Clone the Repository: Download all files from this repository.
-
-Download Dataset and Weights: Access the dataset and model weights from the Google Drive link and place them in the appropriate directories.
-
-Run Brain_Tumor.ipynb: This notebook will walk you through the steps from data loading and preprocessing to model training and evaluation.
-
-## Future Enhancements
-
-__Hyperparameter Tuning__: Further optimize model parameters to improve performance.
-
-__Additional Data__: Integrate larger datasets for enhanced model robustness.
-
-__Real-Time Deployment__: Develop a live web app using Streamlit or Flask for real-time tumor detection and localization.
+*Built by [Vinayak Mokashi](https://github.com/VinayakMokashi).*
