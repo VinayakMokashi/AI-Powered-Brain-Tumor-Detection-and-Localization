@@ -93,9 +93,13 @@ The classifier was evaluated on a held-out test set of 576 scans.
 | F1-score | 0.99 | 0.97 |
 
 - **Overall classification accuracy: 98.1%.**
-- The ResUNet produces tight, well-localized masks; qualitative results (MRI /
-  ground-truth mask / AI-predicted mask overlays) are rendered at the end of
-  the notebook.
+- The ResUNet produces tight, well-localized masks.
+
+![Sample segmentation results](../assets/segmentation_results.png)
+
+*For each scan (left to right): MRI · ground-truth mask · AI-predicted mask ·
+ground-truth overlay (red) · AI-predicted overlay (green). Full results are
+rendered at the end of the notebook.*
 
 ## 5. Limitations & future work
 

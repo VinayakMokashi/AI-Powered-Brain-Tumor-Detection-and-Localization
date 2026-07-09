@@ -15,6 +15,12 @@ flagged as positive.
   <b>MRI scan → [ ResNet50: tumor? ] → if yes → [ ResUNet: where? ] → pixel-level mask</b>
 </p>
 
+<p align="center">
+  <img src="assets/segmentation_results.png" alt="Sample output: MRI, ground-truth mask, AI-predicted mask, and overlays" width="100%">
+  <br>
+  <em>End-to-end output — for each scan: MRI · ground-truth mask · AI-predicted mask · ground-truth overlay (red) · AI-predicted overlay (green).</em>
+</p>
+
 > **Disclaimer:** This is a research / portfolio project. It is **not** a medical
 > device and must not be used for actual diagnosis.
 
@@ -91,6 +97,12 @@ manually annotated binary tumor mask.
 Two metadata files (`data.csv`, `data_mask.csv`) map each scan to its mask and
 store the binary tumor flag.
 
+<p align="center">
+  <img src="assets/dataset_samples.png" alt="Sample MRI scans with tumor masks" width="90%">
+  <br>
+  <em>Tumor-positive samples: MRI · annotated mask · mask overlaid on the scan (red).</em>
+</p>
+
 ## Results
 
 The ResNet50 classifier was evaluated on a held-out test set of **576 scans**:
@@ -103,9 +115,15 @@ The ResNet50 classifier was evaluated on a held-out test set of **576 scans**:
 
 **Overall classification accuracy: 98.1%.**
 
-The ResUNet produces tight, well-localized tumor masks. Qualitative results —
-MRI, ground-truth mask, AI-predicted mask, and overlays — are rendered at the end
-of the notebook.
+<p align="center">
+  <img src="assets/confusion_matrix.png" alt="Classifier confusion matrix on the test set" width="360">
+  <br>
+  <em>Confusion matrix on the 576-scan test set (rows = actual, cols = predicted).</em>
+</p>
+
+The ResUNet produces tight, well-localized tumor masks — see the qualitative
+results shown at the top of this README and rendered in full at the end of the
+notebook.
 
 ## Repository structure
 
@@ -114,10 +132,12 @@ of the notebook.
 ├── Brain_Tumor.ipynb        # End-to-end pipeline: EDA → classifier → segmenter → evaluation
 ├── models.py                # Model builders: ResNet50 classifier + ResUNet
 ├── train.py                 # Reproducible training — regenerates the weights + JSON files
+├── predict.py               # CLI: run the trained pipeline on new MRI scans
 ├── utilities.py             # Custom DataGenerator, Focal Tversky loss, two-stage inference
 ├── requirements.txt         # Pinned Python dependencies
 ├── docs/
 │   └── PROJECT_REPORT.md    # Technical write-up (problem, approach, results, limitations)
+├── assets/                  # Result figures used in the README / report
 ├── LICENSE                  # MIT
 ├── .gitignore
 └── README.md
@@ -190,6 +210,22 @@ or Google Drive, drop the four files into the dataset folder and jump straight t
 the evaluation cells. *(No pre-trained weights are published yet — use `train.py`
 above to generate them.)*
 
+### Run inference on new scans
+
+Once you have the trained weights, [`predict.py`](predict.py) runs the full
+pipeline on unseen scans from the command line:
+
+```bash
+# single scan
+python predict.py --image path/to/scan.tif
+
+# a folder of scans -> overlay PNGs saved in ./predictions
+python predict.py --dir path/to/scans --out-dir predictions
+```
+
+For each scan it prints whether a tumor was detected and, for positives, saves a
+side-by-side **MRI / predicted mask / overlay** figure (tumor region in green).
+
 ## How the code is organized
 
 Most of the pipeline lives in the notebook, but the pieces that don't fit
@@ -204,8 +240,9 @@ off-the-shelf Keras are factored into [`utilities.py`](utilities.py):
   test set and returns per-scan masks and a has-tumor flag.
 
 The network architectures live in [`models.py`](models.py) (`build_classifier`,
-`build_resunet`), and [`train.py`](train.py) wires the data, models and loss
-together into a single reproducible training run.
+`build_resunet`), [`train.py`](train.py) wires the data, models and loss together
+into a single reproducible training run, and [`predict.py`](predict.py) loads the
+trained models to run the pipeline on new scans.
 
 ## Tech stack
 
