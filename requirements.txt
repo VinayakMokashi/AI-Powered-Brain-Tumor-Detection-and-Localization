@@ -1,0 +1,27 @@
+# Core deep learning stack
+# The models were built and trained with TensorFlow 2.11 (Keras bundled).
+tensorflow==2.11.0
+Keras-Preprocessing==1.1.2
+
+# Numerical / data handling
+numpy>=1.21,<1.24
+pandas>=1.3
+
+# Image I/O and processing
+opencv-python>=4.5
+scikit-image>=0.19
+
+# Classical ML utilities (train/test split, metrics)
+scikit-learn>=1.0
+
+# Visualisation
+matplotlib>=3.4
+seaborn>=0.11
+plotly>=5.0
+
+# NOTE
+# ----
+# The notebook was developed on Google Colab, which additionally provides
+# `google.colab` (drive mount / file upload). That package ships with Colab and
+# is NOT installed from PyPI - drop the `from google.colab import ...` lines if
+# you run the notebook locally.
