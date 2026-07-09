@@ -178,6 +178,9 @@ data_mask.csv
 weights*.hdf5
 *-MRI.json
 
+# predict.py inference output
+predictions/
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db
